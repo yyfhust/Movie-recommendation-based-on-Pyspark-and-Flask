@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+
+<p>Rating the following 10 movies, and you can click refresh to change a list of movies</p>
+<p>When you finish rating, click "recommendation" to get movie recommendations for you! </p>
+<ul class="movie-list">
+
+    {% for movie in movies %}
+    <li>{{ movie[1] }} - {{ movie[3]}}
+        <span class="float-right">
+            <a class="btn" href="{{ url_for('edit', movie_id=movie[0]) }}">Rate this movie</a> 
+        </span>
+    </li>
+    {% endfor %}
+
+</ul> 
+
+<span class="float-right">
+    <a class="btn" href="{{ url_for('rating') }}">refresh</a> 
+</span>
+
+
+<span class="float-right">
+    <a class="btn" href="{{ url_for('recommendation') }}">recommendation</a> 
+</span>
+
+<img alt="Walking Totoro" class="totoro" src="{{ url_for('static', filename='images/logo.png') }}" title="to~to~ro~">
+{% endblock %}

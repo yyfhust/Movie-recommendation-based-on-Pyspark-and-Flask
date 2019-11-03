@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+
+
+
+<p>TWe highly recommend these 10 movies for you based on your ratings : </p>
+
+<ul class="movie-list">
+
+    {% for movie in movies %}
+    <li>{{ movie[1] }} 
+        <span class="float-right">
+            {{movie[2]}}
+        </span>
+    </li>
+    {% endfor %}
+
+</ul> 
+<img alt="Walking Totoro" class="totoro" src="{{ url_for('static', filename='images/logo.png') }}" title="to~to~ro~">
+{% endblock %}

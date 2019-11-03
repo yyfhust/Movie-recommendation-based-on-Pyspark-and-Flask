@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+
+
+
+<p>The Most Popular 10 Movies: </p>
+<p>You can also get customized recommendations by clicking this button </p>
+<br> 
+
+<span class="float-right">
+        <a class="btn" href="{{ url_for('rating') }}">Get recommendation for you ! </a>
+    </span>
+
+    <br> 
+<ul class="movie-list">
+
+
+    <li>Movie Title: 
+            <span class="float-right">
+                Number of Ratings:
+            </span>
+        </li>
+
+    {% for movie in movies_top %}
+    <li>{{ movie["title"] }} 
+        <span class="float-right">
+            {{movie['rating_count']}}
+        </span>
+    </li>
+    {% endfor %}
+
+</ul> 
+<img alt="Walking Totoro" class="totoro" src="{{ url_for('static', filename='images/logo.png') }}" title="to~to~ro~">
+{% endblock %}

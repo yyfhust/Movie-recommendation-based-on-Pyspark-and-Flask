@@ -1,9 +1,14 @@
+{% extends 'base.html' %}
 
 {% block content %}
-<h3>Edit item</h3>
+<h3>Rate the Movie</h3>
+<h3>Note: the score must be within (1 - 5)! </h3>
+
 <form method="post">
-    Name <input type="text" name="title" autocomplete="off" required value="{{ movie.title }}">
-    Year <input type="text" name="year" autocomplete="off" required value="{{ movie.year }}">
-    <input class="btn" type="submit" name="submit" value="Update">
+    {{movie[1]}} 
+
+
+   Rating:  <input type="text" name="rating" autocomplete="off" required value="5">
+    <input class="btn" type="submit" name="submit" value="Rate">
 </form>
 {% endblock %}

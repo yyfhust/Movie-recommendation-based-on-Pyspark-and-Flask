@@ -8,21 +8,22 @@ import click
 from flask import request
 from flask import flash
 from flask import redirect
+from flask import Blueprint
+main = Blueprint('main', __name__)
+ 
+import json
+import random 
+#import time, sys, cherrypy, os
+from paste.translogger import TransLogger
+#from app import create_app
+#from pyspark import SparkContext, SparkConf
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
-name = 'Grey Li'
-movies = [
-    {'title': 'My Neighbor Totoro', 'year': '1988'},
-    {'title': 'Dead Poets Society', 'year': '1989'},
-    {'title': 'A Perfect World', 'year': '1993'},
-    {'title': 'Leon', 'year': '1994'},
-    {'title': 'Mahjong', 'year': '1996'},
-    {'title': 'Swallowtail Butterfly', 'year': '1996'},
-    {'title': 'King of Comedy', 'year': '1999'},
-    {'title': 'Devils on the Doorstep', 'year': '1999'},
-    {'title': 'WALL-E', 'year': '2008'},
-    {'title': 'The Pork of Music', 'year': '2012'},
-]
+from recommendation_engine import RecommendationEngine
+from pyspark import SparkConf, SparkContext, SQLContext
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'dev'  # 等同于 app.secret_key = 'dev'
@@ -40,85 +41,129 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # 关闭对模型修改的
 db = SQLAlchemy(app)
 
 
+##homepage (replace index!)
+## show Top 10 most popular movies with poster!
 @app.route('/', methods=['GET', 'POST'])
-def index():
-    if request.method == 'POST':  # 判断是否是 POST 请求
-        # 获取表单数据
-        title = request.form.get('title')  # 传入表单对应输入字段的 name 值
-        year = request.form.get('year')
-        # 验证数据
-        if not title or not year or len(year) > 4 or len(title) > 60:
-            flash('Invalid input.')  # 显示错误提示
-            return redirect(url_for('index'))  # 重定向回主页
-        # 保存表单数据到数据库
-        movie = Movie(title=title, year=year)  # 创建记录
-        db.session.add(movie)  # 添加到数据库会话
-        db.session.commit()  # 提交数据库会话
-        flash('Item created.')  # 显示成功创建的提示
-        return redirect(url_for('index'))  # 重定向回主页
+def home():
+## To Do ###
+### fetch Top 10 movies 
+    # movies_top10 = recommender.get_top10() #
+    sc = SparkContext.getOrCreate()
+    global movie_recommender 
+    global index_
+    index_= 0
+    movie_recommender = RecommendationEngine( sc,"datasets/ml-latest-small/"  )
+
+    #movies_top10 = Movie_top10.query.all()  ## to be replaced by the above line
+    movies_top10 = movie_recommender.top_10_popular_movies()
+
+    db.drop_all()
+    db.create_all()
+
+    return render_template('home.html',movies_top=movies_top10)  ## parameters: movies is Top10 movies list
+
+
+##page for recommendation
+@app.route('/recommendation', methods=['GET', 'POST'])
+def recommendation():
+    # recommendation_list = recommender.get_top10recommendation()
+    #recommendation_list =[]
+    movie_recommender.train_engin()
+    user_rated = Movie_rated.query.all()
     
-    user = User.query.first()
-    movies = Movie.query.all()
-    return render_template('index.html', user=user, movies=movies)
+    user_rating_list = list(map( lambda x: ( 0, x.movie_num,x.rating    )      ,user_rated))
+    print(user_rating_list)
+    print(">>>>>>>>>>>>>>>>>>")
+    
+    recommendation_list = movie_recommender.get_recommendation(user_rating_list)
+    print (recommendation_list)
+    return render_template('recommendation.html',movies = recommendation_list )
+
+
+
+##page for rating
+@app.route('/rating', methods=['GET', 'POST'])
+def rating():
+    ### at this moment, all(maybe partly) movies should be saved in the database
+    #all_movies = Movie.query.all()
+    all_movies = movie_recommender.get_all_movies()
+    global movies_20
+    global index_
+
+
+    movies_20 = all_movies[ index_ * 10: (index_+1)*10] ## display 10 movies at one time
+    index_ = index_+1 
+    return render_template('rating.html',movies = movies_20 )
+
 
 
 @app.route('/movie/edit/<int:movie_id>', methods=['GET', 'POST'])
 def edit(movie_id):
-    movie = Movie.query.get_or_404(movie_id)
-    print (movie.id)
+
+    movie = movie_recommender.get_movie_by_ID(movie_id)[0]
+
+    for i,item in enumerate(movies_20):
+        if item[0] == movie_id:
+            index = i
+            
     if request.method == 'POST':  # 处理编辑表单的提交请求
-        title = request.form['title']
-        year = request.form['year']
+        print("receive rating")
+       # title = request.form['title']
+        rating = request.form['rating']
+        
+      #  movie.rating = rating
 
-        if not title or not year or len(year) > 4 or len(title) > 60:
-            flash('Invalid input.')
-            return redirect(url_for('edit', movie_id=movie_id))  # 重定向回对应的编辑页面
+        new_tuple= ( movie_id,movie[1],200, rating  )
+        movies_20[index] = new_tuple
+        #print(movies_20[index].rating)
 
-        movie.title = title  # 更新标题
-        movie.year = year  # 更新年份
-        db.session.commit()  # 提交数据库会话
-        flash('Item updated.')
-        return redirect(url_for('index'))  # 重定向回主页
+        movie_rated = Movie_rated(title=movie[1], movie_num=movie[0],rating=rating)
+
+        db.session.add(movie_rated)    
+        db.session.commit()
+
+
+        flash('rating finished')
+        print ("redirect to index")
+      #  return redirect(url_for('rating'))  # 重定向回主页
+        return render_template('rating.html',movies = movies_20 )
 
     return render_template('edit.html', movie=movie)  # 传入被编辑的电影记录
+
+
+
+
 
 
 class User(db.Model):  # 表名将会是 user（自动生成，小写处理）
     id = db.Column(db.Integer, primary_key=True)  # 主键
     name = db.Column(db.String(20))  # 名字
 
+## movies rated by the user
+class Movie_rated(db.Model):
 
-class Movie(db.Model):  # 表名将会是 movie
+    def __eq__(self, other) : 
+        return self.__dict__ == other.__dict__
     id = db.Column(db.Integer, primary_key=True)  # 主键
+    movie_num = db.Column(db.Integer)  ## id number of the movie
     title = db.Column(db.String(60))  # 电影标题
-    year = db.Column(db.String(4))  # 电影年份
+    rating = db.Column(db.Integer) ## rating of the movie by the user
+ #   user_id = db.Column(db.Integer)  ## id of the user who rated this movie  
 
 
-@app.cli.command()
-def forge():
-    """Generate fake data."""
-    db.create_all()
 
-    # 全局的两个变量移动到这个函数内
-    name = 'Grey Li'
-    movies = [
-        {'title': 'My Neighbor Totoro', 'year': '1988'},
-        {'title': 'Dead Poets Society', 'year': '1989'},
-        {'title': 'A Perfect World', 'year': '1993'},
-        {'title': 'Leon', 'year': '1994'},
-        {'title': 'Mahjong', 'year': '1996'},
-        {'title': 'Swallowtail Butterfly', 'year': '1996'},
-        {'title': 'King of Comedy', 'year': '1999'},
-        {'title': 'Devils on the Doorstep', 'year': '1999'},
-        {'title': 'WALL-E', 'year': '2008'},
-        {'title': 'The Pork of Music', 'year': '2012'},
-    ]
 
-    user = User(name=name)
-    db.session.add(user)
-    for m in movies:
-        movie = Movie(title=m['title'], year=m['year'])
-        db.session.add(movie)
+@app.context_processor
+def inject_user():  # 函数名可以随意修改
+    user = User.query.first()
+    return dict(user=user)  # 需要返回字典，等同于return {'user': user}
 
-    db.session.commit()
-    click.echo('Done.')
+
+
+
+
+
+
+
+
+
