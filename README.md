@@ -1,4 +1,4 @@
-# Movie Recommendation System
+# Movie Recommendation System based on Pyspark and Flask
 
 ## Background
 With the rapid development of the network information age, the demand of movies viewing for people is more and more. However, the number of movies is so massive that people usually don't know how to choose a good movie. Personalized recommendation system is very helpful and useful to recommend high rating movies to users based on the personal preference.
